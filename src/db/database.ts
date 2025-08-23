@@ -1,0 +1,61 @@
+import { Db, MongoClient, ServerApiVersion } from "mongodb";
+import { validateSecret } from "../security/validateEnv.js";
+
+// Runtime-Validation
+const uri: string = validateSecret(process.env.DB_CONNECTION_STRING);
+const dbName: string = validateSecret(process.env.DB_NAME);
+
+const client = new MongoClient(uri, {
+  serverApi: {
+    version: ServerApiVersion.v1,
+    strict: true,
+    deprecationErrors: true,
+  },
+});
+
+let isConnected = false;
+
+/**
+ * Attempts to connect to database.
+ * Returns a promise.
+ * Throws error at failed attempt.
+ */
+export async function runDB(): Promise<void> {
+  if (isConnected) return; // prevent duplicate connects
+
+  try {
+    await client.connect();
+    await client.db("admin").command({ ping: 1 });
+
+    isConnected = true;
+    console.log("Db is up and running");
+    
+    console.log("Connected to DB:", dbName);
+    
+  } catch (err) {
+    console.error("Database connection failed:", err);
+    throw err;
+  }
+}
+
+
+/**
+ * Returns the connected database instance.
+ * Throws an error if accessed before connecting.
+ */
+export function getDB(): Db {
+  if (!isConnected) {
+    throw new Error("Tried to access DB before connecting");
+  }
+  return client.db(dbName);
+}
+
+/**
+ * Closes the MongoDB connection.
+ */
+export async function closeDB(): Promise<void> {
+  await client.close();
+  isConnected = false;
+  console.log("MongoDB connection closed");
+}
+
